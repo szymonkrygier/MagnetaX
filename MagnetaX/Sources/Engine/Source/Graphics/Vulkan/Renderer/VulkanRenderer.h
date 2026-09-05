@@ -18,6 +18,7 @@
 #include "PostFX/VulkanToneMapPass.h"
 #include "Temporal/VulkanTAAPass.h"
 #include "Temporal/VulkanCamVelocityPass.h"
+#include "Temporal/VulkanLuminancePass.h"
 #include "Shadow/VulkanShadowDepthPass.h"
 #include "UI/VulkanUIPass.h"
 #include "Environment/VulkanEnvironmentRenderData.h"
@@ -185,8 +186,11 @@ private:
     std::array<VkImageLayout, 2> taaHistoryLayouts{ VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED };
     std::array<VulkanImage, 2> taaDepthHistory;
     std::array<VkImageLayout, 2> taaDepthHistoryLayouts{ VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED };
+    VulkanImage luminanceContext;
+    VkImageLayout luminanceContextLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     VulkanCamVelocityPass camVelocityPass;
     VulkanTAAPass taaPass;
+    VulkanLuminancePass luminancePass;
     uint64 taaFrameIndex = 0;
     uint32 taaHistoryReadIndex = 0;
     bool prevFrameValid = false;
@@ -197,6 +201,8 @@ private:
     uint32 prevCameraId = 0;
     std::unordered_map<uint32, Matrix4f> prevObjectModels;
     std::vector<Matrix4f> framePrevModels;
+    std::array<VulkanImage, 2> taaMetadataHistory;
+    std::array<VkImageLayout, 2> taaMetadataHistoryLayouts{ VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED };
 
     // Tone mapping pass
     VulkanImage ldrColor;

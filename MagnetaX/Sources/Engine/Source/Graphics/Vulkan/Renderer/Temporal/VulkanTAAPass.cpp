@@ -27,6 +27,7 @@ bool VulkanTAAPass::Create(const VulkanTAAPassCreateInfo& createInfo)
     if (!createInfo.currentColor->GetImageView()) return false;
     if (!createInfo.velocityImage->GetImageView() || !createInfo.depthImage->GetImageView()) return false;
     if (createInfo.outFormat == VK_FORMAT_UNDEFINED) return false;
+    if (createInfo.metadataFormat == VK_FORMAT_UNDEFINED) return false;
 
     const VkDevice buffDevice = createInfo.device->GetDevice();
     if (!buffDevice) return false;
@@ -35,7 +36,7 @@ bool VulkanTAAPass::Create(const VulkanTAAPassCreateInfo& createInfo)
 
     device = buffDevice;
 
-    VkDescriptorSetLayoutBinding bindings[5]{};
+    VkDescriptorSetLayoutBinding bindings[7]{};
 
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -62,7 +63,17 @@ bool VulkanTAAPass::Create(const VulkanTAAPassCreateInfo& createInfo)
     bindings[4].descriptorCount = 1;
     bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    const VkDescriptorSetLayoutCreateInfo layoutInfo = VulkanInitializers::DescriptorSetLayoutCreateInfo(5, bindings);
+    bindings[5].binding = 5;
+    bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[5].descriptorCount = 1;
+    bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    bindings[6].binding = 6;
+    bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[6].descriptorCount = 1;
+    bindings[6].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    const VkDescriptorSetLayoutCreateInfo layoutInfo = VulkanInitializers::DescriptorSetLayoutCreateInfo(7, bindings);
 
     if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descSetLayout) != VK_SUCCESS)
     {
@@ -90,7 +101,7 @@ bool VulkanTAAPass::Create(const VulkanTAAPassCreateInfo& createInfo)
 
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSize.descriptorCount = 5;
+    poolSize.descriptorCount = 7;
 
     const VkDescriptorPoolCreateInfo poolInfo = VulkanInitializers::DescriptorPoolCreateInfo(1, 1, &poolSize);
 
@@ -163,13 +174,19 @@ bool VulkanTAAPass::Create(const VulkanTAAPassCreateInfo& createInfo)
     pushConstRange.offset = 0;
     pushConstRange.size = sizeof(TAAPushConstants);
 
+    const VkFormat colorFormats[2] =
+    {
+        createInfo.outFormat,
+        createInfo.metadataFormat
+    };
+
     VulkanPipelineCreateInfo pipelineInfo{};
     pipelineInfo.vertexShader = MX_GRAPHICS_VULKAN_SHADER_FULLSCREEN_VERT;
     pipelineInfo.vertexShaderSize = MX_GRAPHICS_VULKAN_SHADER_FULLSCREEN_VERT_SIZE;
     pipelineInfo.fragmentShader = MX_GRAPHICS_VULKAN_SHADER_TAA_FRAG;
     pipelineInfo.fragmentShaderSize = MX_GRAPHICS_VULKAN_SHADER_TAA_FRAG_SIZE;
-    pipelineInfo.colorFormats = &createInfo.outFormat;
-    pipelineInfo.colorFormatCount = 1;
+    pipelineInfo.colorFormats = colorFormats;
+    pipelineInfo.colorFormatCount = 2;
     pipelineInfo.descriptorSetLayouts = &descSetLayout;
     pipelineInfo.descriptorSetLayoutCount = 1;
     pipelineInfo.pushConstantRanges = &pushConstRange;
@@ -207,7 +224,8 @@ void VulkanTAAPass::Record(const VulkanTAAPassRenderInfo& renderInfo)
 {
     if (!renderInfo.cmdBuffer || !renderInfo.historyView || !renderInfo.targetView) return;
     if (renderInfo.extent.width == 0 || renderInfo.extent.height == 0) return;
-    if (!renderInfo.previousDepthView) return;
+    if (!renderInfo.previousDepthView || !renderInfo.metadataTargetView || !renderInfo.metadataHistoryView) return;
+    if (!renderInfo.luminanceContextView) return;
 
     VkDescriptorImageInfo historyImageInfo{};
     historyImageInfo.sampler = sampler;
@@ -219,7 +237,17 @@ void VulkanTAAPass::Record(const VulkanTAAPassRenderInfo& renderInfo)
     previousDepthImageInfo.imageView = renderInfo.previousDepthView;
     previousDepthImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    VkWriteDescriptorSet dynamicWrites[2]{};
+    VkDescriptorImageInfo metadataHistoryImageInfo{};
+    metadataHistoryImageInfo.sampler = sampler;
+    metadataHistoryImageInfo.imageView = renderInfo.metadataHistoryView;
+    metadataHistoryImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorImageInfo luminanceContextImageInfo{};
+    luminanceContextImageInfo.sampler = sampler;
+    luminanceContextImageInfo.imageView = renderInfo.luminanceContextView;
+    luminanceContextImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkWriteDescriptorSet dynamicWrites[4]{};
 
     dynamicWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     dynamicWrites[0].dstSet = descSet;
@@ -235,23 +263,43 @@ void VulkanTAAPass::Record(const VulkanTAAPassRenderInfo& renderInfo)
     dynamicWrites[1].descriptorCount = 1;
     dynamicWrites[1].pImageInfo = &previousDepthImageInfo;
 
-    vkUpdateDescriptorSets(device, 2, dynamicWrites, 0, nullptr);
+    dynamicWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    dynamicWrites[2].dstSet = descSet;
+    dynamicWrites[2].dstBinding = 5;
+    dynamicWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    dynamicWrites[2].descriptorCount = 1;
+    dynamicWrites[2].pImageInfo = &metadataHistoryImageInfo;
 
-    VkRenderingAttachmentInfo colorAttachment{};
-    colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachment.imageView = renderInfo.targetView;
-    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.clearValue.color = { { 0.0f, 0.0f, 0.0f, 1.0f } };
-    colorAttachment.pNext = nullptr;
+    dynamicWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    dynamicWrites[3].dstSet = descSet;
+    dynamicWrites[3].dstBinding = 6;
+    dynamicWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    dynamicWrites[3].descriptorCount = 1;
+    dynamicWrites[3].pImageInfo = &luminanceContextImageInfo;
+
+    vkUpdateDescriptorSets(device, 4, dynamicWrites, 0, nullptr);
+
+VkRenderingAttachmentInfo colorAttachments[2]{};
+
+    for (VkRenderingAttachmentInfo& attachment : colorAttachments)
+    {
+        attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachment.clearValue.color = { { 0.0f, 0.0f, 0.0f, 0.0f } };
+        attachment.pNext = nullptr;
+    }
+
+    colorAttachments[0].imageView = renderInfo.targetView;
+    colorAttachments[1].imageView = renderInfo.metadataTargetView;
 
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea = { { 0, 0 }, renderInfo.extent };
     renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachment;
+    renderingInfo.colorAttachmentCount = 2;
+    renderingInfo.pColorAttachments = colorAttachments;
     renderingInfo.pNext = nullptr;
 
     vkCmdBeginRendering(renderInfo.cmdBuffer, &renderingInfo);

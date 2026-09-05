@@ -30,11 +30,8 @@ float Luminance(vec3 color)
 void main()
 {
     vec3 color = texture(sceneColor, fragUV).rgb;
-
     color *= exp2(pc.exposureEV);
-    //color *= exp2(2.0);
     color = ToneMapACES(color);
-
-    // Final RGB + luminance value in alpha channel
+    
     outColor = vec4(color, Luminance(color));
 }
