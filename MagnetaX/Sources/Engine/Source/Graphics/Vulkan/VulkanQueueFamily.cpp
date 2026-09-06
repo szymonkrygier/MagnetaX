@@ -20,8 +20,9 @@ VulkanQueueFamily::Indices VulkanQueueFamily::FindQueueFamilies(VkPhysicalDevice
         if (queueFamilies[i].queueCount == 0) continue;
 
         const VkQueueFlags queueFlags = queueFamilies[i].queueFlags;
+        const VkQueueFlags requiredGraphicsFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
 
-        if (!result.HasGraphics() && (queueFlags & VK_QUEUE_GRAPHICS_BIT)) result.graphics = i;
+        if (!result.HasGraphics() && (queueFlags & requiredGraphicsFlags) == requiredGraphicsFlags) result.graphics = i;
 
         if (queueFlags & VK_QUEUE_TRANSFER_BIT)
         {
