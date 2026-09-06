@@ -9,6 +9,7 @@ struct VulkanGBufferCreateInfo
     VulkanDevice* device;
     VkExtent2D extent;
     bool createVelocity = false;
+    VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
 };
 
 class VulkanGBuffer

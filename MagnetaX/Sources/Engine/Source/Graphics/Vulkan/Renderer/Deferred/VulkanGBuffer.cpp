@@ -19,6 +19,7 @@ bool VulkanGBuffer::Create(const VulkanGBufferCreateInfo& createInfo)
     imageInfo.device = createInfo.device;
     imageInfo.extent = extent;
     imageInfo.usage = colorUsage;
+    imageInfo.sampleCount = createInfo.sampleCount;
 
     imageInfo.format = ImageFormat::RGBA8_UNORM;
     if (!albedoImage.Create(imageInfo))

@@ -58,6 +58,7 @@ bool VulkanGBufferPass::Create(const VulkanGBufferPassCreateInfo& createInfo)
     gBufferInfo.device = createInfo.device;
     gBufferInfo.extent = createInfo.extent;
     gBufferInfo.createVelocity = createInfo.velocityEnabled;
+    gBufferInfo.sampleCount = createInfo.sampleCount;
 
     if (!gBuffer.Create(gBufferInfo))
     {
@@ -184,6 +185,7 @@ bool VulkanGBufferPass::Create(const VulkanGBufferPassCreateInfo& createInfo)
     pipelineInfo.depthCompareOp = VK_COMPARE_OP_LESS;
     pipelineInfo.cullMode = VK_CULL_MODE_BACK_BIT;
     pipelineInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    pipelineInfo.sampleCount = createInfo.sampleCount;
 
     if (!pipeline.Create(buffDevice, pipelineInfo))
     {

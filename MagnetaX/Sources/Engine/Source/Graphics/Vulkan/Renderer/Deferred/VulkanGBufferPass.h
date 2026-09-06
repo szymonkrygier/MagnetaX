@@ -16,6 +16,7 @@ struct VulkanGBufferPassCreateInfo : VulkanPassCreateInfo
     VkExtent2D extent{};
     VkDescriptorSetLayout materialDescSetLayout = VK_NULL_HANDLE;
     bool velocityEnabled = false;
+    VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
 };
 
 struct VulkanGBufferPassRenderInfo : VulkanPassRenderInfo

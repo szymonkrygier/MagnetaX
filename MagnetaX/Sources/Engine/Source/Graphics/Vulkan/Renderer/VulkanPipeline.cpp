@@ -125,7 +125,9 @@ bool VulkanPipeline::Create(VkDevice _device, const VulkanPipelineCreateInfo& cr
 
     VkPipelineMultisampleStateCreateInfo multisampleInfo{};
     multisampleInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampleInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampleInfo.rasterizationSamples = createInfo.sampleCount;
+    multisampleInfo.sampleShadingEnable = createInfo.sampleShading ? VK_TRUE : VK_FALSE;
+    multisampleInfo.minSampleShading = createInfo.sampleShading ? 1.0f : 0.0f;
 
     VkPipelineDepthStencilStateCreateInfo depthInfo{};
     depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
