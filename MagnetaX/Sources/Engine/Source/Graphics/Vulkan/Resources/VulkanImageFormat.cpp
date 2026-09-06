@@ -21,6 +21,10 @@ VkFormat VulkanImageFormat::FromImageFormat(ImageFormat format)
         return VK_FORMAT_R16G16B16A16_SFLOAT;
     case ImageFormat::RGBA32_FLOAT:
         return VK_FORMAT_R32G32B32A32_SFLOAT;
+    case ImageFormat::R32_FLOAT:
+        return VK_FORMAT_R32_SFLOAT;
+    case ImageFormat::R32_UINT:
+        return VK_FORMAT_R32_UINT;
     case ImageFormat::D32_FLOAT:
         return VK_FORMAT_D32_SFLOAT;
     case ImageFormat::R8_UNORM:
@@ -48,6 +52,10 @@ ImageFormat VulkanImageFormat::ToImageFormat(VkFormat format)
         return ImageFormat::RGBA16_FLOAT;
     case VK_FORMAT_R32G32B32A32_SFLOAT:
         return ImageFormat::RGBA32_FLOAT;
+    case VK_FORMAT_R32_SFLOAT:
+        return ImageFormat::R32_FLOAT;
+    case VK_FORMAT_R32_UINT:
+        return ImageFormat::R32_UINT;
     case VK_FORMAT_D32_SFLOAT:
         return ImageFormat::D32_FLOAT;
     case VK_FORMAT_R8_UNORM:
@@ -68,6 +76,8 @@ VkImageAspectFlags VulkanImageFormat::GetImageAspect(ImageFormat format)
     case ImageFormat::RG16_FLOAT:
     case ImageFormat::RGBA16_FLOAT:
     case ImageFormat::RGBA32_FLOAT:
+    case ImageFormat::R32_FLOAT:
+    case ImageFormat::R32_UINT:
     case ImageFormat::R8_UNORM:
         return VK_IMAGE_ASPECT_COLOR_BIT;
     case ImageFormat::D32_FLOAT:

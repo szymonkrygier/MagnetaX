@@ -14,6 +14,8 @@ enum class ImageFormat : uint8
     RG16_FLOAT,
     RGBA16_FLOAT,
     RGBA32_FLOAT,
+    R32_FLOAT,
+    R32_UINT,
     D32_FLOAT,
     R8_UNORM
 };
@@ -33,6 +35,8 @@ struct ImageFormatUtils
             case ImageFormat::RGBA8_UNORM:
             case ImageFormat::D32_FLOAT:
             case ImageFormat::RG16_FLOAT:
+            case ImageFormat::R32_FLOAT:
+            case ImageFormat::R32_UINT:
                 return 4;
             case ImageFormat::RGBA16_FLOAT:
                 return 8;
