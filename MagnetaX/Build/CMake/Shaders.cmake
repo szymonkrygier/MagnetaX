@@ -20,6 +20,7 @@ function(MXBAddShaders out_headers_target out_include_dir)
   file(GLOB_RECURSE MXB_SOURCE_SHADERS CONFIGURE_DEPENDS
     "${MXB_DIR_SHADERS}/*.vert"
     "${MXB_DIR_SHADERS}/*.frag"
+    "${MXB_DIR_SHADERS}/*.comp"
   )
 
   set(MXB_SOURCE_SHADERS_SPV "")
