@@ -8,4 +8,5 @@ struct GraphicsCapabilities
 {
     bool samplerAniso = false;
     float32 maxSamplerAniso = 1.0f;
+    bool sampleRateShading = false;
 };

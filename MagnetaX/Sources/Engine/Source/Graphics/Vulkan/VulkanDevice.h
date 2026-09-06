@@ -4,6 +4,7 @@
 
 #include <MX/Graphics/GraphicsCapabilities.h>
 #include <MX/Graphics/GraphicsDeviceInfo.h>
+#include <MX/Graphics/Resources/ImageFormat.h>
 #include "VulkanCommon.h"
 
 class VulkanDevice
@@ -31,6 +32,8 @@ public:
     const GraphicsDeviceInfo& GetInfo() const { return info; }
 
     uint32 FindMemoryType(uint32 type, VkMemoryPropertyFlags memoryProps) const;
+
+    bool SupportsImageSampleCount(ImageFormat format, VkImageUsageFlags usage, VkSampleCountFlagBits sampleCount) const;
 
 private:
     VkDevice device = VK_NULL_HANDLE;

@@ -4,6 +4,7 @@
 
 #if MX_GRAPHICS_VULKAN
 #include "VulkanQueueFamily.h"
+#include "Resources/VulkanImageFormat.h"
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -235,6 +236,23 @@ uint32 VulkanDevice::FindMemoryType(uint32 type, VkMemoryPropertyFlags memoryPro
     return UINT32_MAX;
 }
 
+bool VulkanDevice::SupportsImageSampleCount(ImageFormat format, VkImageUsageFlags usage, VkSampleCountFlagBits sampleCount) const
+{
+    if (!physicalDevice || usage == 0 || sampleCount == 0) return false;
+
+    const VkFormat vkFormat = VulkanImageFormat::FromImageFormat(format);
+    if (vkFormat == VK_FORMAT_UNDEFINED) return false;
+
+    VkImageFormatProperties properties{};
+
+    if (vkGetPhysicalDeviceImageFormatProperties(physicalDevice, vkFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, usage, 0, &properties) != VK_SUCCESS)
+    {
+        return false;
+    }
+
+    return (properties.sampleCounts & sampleCount) == sampleCount;
+}
+
 bool VulkanDevice::CreateDevice(VkInstance instance, VkSurfaceKHR surface)
 {
     DebugLog("Creating Vulkan device");
@@ -293,6 +311,7 @@ bool VulkanDevice::CreateDevice(VkInstance instance, VkSurfaceKHR surface)
 
     capabilities.samplerAniso = physicalDeviceFeatures.samplerAnisotropy == VK_TRUE;
     capabilities.maxSamplerAniso = capabilities.samplerAniso ? physicalDeviceProps.limits.maxSamplerAnisotropy : 1.0f;
+    capabilities.sampleRateShading = physicalDeviceFeatures.sampleRateShading == VK_TRUE;
 
     // Find core queue families
     const VulkanQueueFamily::Indices queueFamilyIndices = VulkanQueueFamily::FindQueueFamilies(physicalDevice, surface);
@@ -320,6 +339,7 @@ bool VulkanDevice::CreateDevice(VkInstance instance, VkSurfaceKHR surface)
     VkPhysicalDeviceFeatures2 vkFeatures2{};
     vkFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     vkFeatures2.features.samplerAnisotropy = capabilities.samplerAniso ? VK_TRUE : VK_FALSE;
+    vkFeatures2.features.sampleRateShading = capabilities.sampleRateShading ? VK_TRUE : VK_FALSE;
     vkFeatures2.pNext = &vk13Features;
 
     // Create queue infos
