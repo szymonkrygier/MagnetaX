@@ -16,6 +16,8 @@ struct VulkanImageCreateInfo
     uint32 mipLevels = 1;
     uint32 arrayLayers = 1;
 
+    VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
+
     VkImageCreateFlags flags = 0;
     VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D;
 };

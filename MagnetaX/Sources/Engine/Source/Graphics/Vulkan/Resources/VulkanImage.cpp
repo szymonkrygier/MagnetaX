@@ -81,7 +81,7 @@ bool VulkanImage::Create(const VulkanImageCreateInfo& createInfo)
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imageInfo.usage = createInfo.usage;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = createInfo.sampleCount;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     imageInfo.pNext = nullptr;
 
