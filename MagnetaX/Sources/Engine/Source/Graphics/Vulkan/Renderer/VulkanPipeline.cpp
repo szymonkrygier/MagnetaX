@@ -208,6 +208,62 @@ bool VulkanPipeline::Create(VkDevice _device, const VulkanPipelineCreateInfo& cr
     return true;
 }
 
+bool VulkanPipeline::Create(VkDevice _device, const VulkanComputePipelineCreateInfo& createInfo)
+{
+    if (!_device || !createInfo.computeShader || createInfo.computeShaderSize == 0) return false;
+    if (createInfo.descriptorSetLayoutCount && !createInfo.descriptorSetLayouts) return false;
+    if (createInfo.pushConstantRangeCount && !createInfo.pushConstantRanges) return false;
+
+    Destroy();
+
+    device = _device;
+
+    VkShaderModule computeShaderModule = CreateShaderModule(device, createInfo.computeShader, createInfo.computeShaderSize);
+
+    if (!computeShaderModule)
+    {
+        Destroy();
+        return false;
+    }
+
+    VkPipelineLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    layoutInfo.setLayoutCount = createInfo.descriptorSetLayoutCount;
+    layoutInfo.pSetLayouts = createInfo.descriptorSetLayouts;
+    layoutInfo.pushConstantRangeCount = createInfo.pushConstantRangeCount;
+    layoutInfo.pPushConstantRanges = createInfo.pushConstantRanges;
+
+    if (vkCreatePipelineLayout(device, &layoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
+    {
+        vkDestroyShaderModule(device, computeShaderModule, nullptr);
+        Destroy();
+        return false;
+    }
+
+    VkPipelineShaderStageCreateInfo shaderStage{};
+    shaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    shaderStage.module = computeShaderModule;
+    shaderStage.pName = "main";
+
+    VkComputePipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfo.stage = shaderStage;
+    pipelineInfo.layout = pipelineLayout;
+
+    const VkResult result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
+
+    vkDestroyShaderModule(device, computeShaderModule, nullptr);
+
+    if (result != VK_SUCCESS)
+    {
+        Destroy();
+        return false;
+    }
+
+    return true;
+}
+
 void VulkanPipeline::Destroy()
 {
     if (device)

@@ -39,6 +39,18 @@ struct VulkanPipelineCreateInfo
     VkFrontFace frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 };
 
+struct VulkanComputePipelineCreateInfo
+{
+    const uint32* computeShader = nullptr;
+    usize computeShaderSize = 0;
+
+    const VkDescriptorSetLayout* descriptorSetLayouts = nullptr;
+    uint32 descriptorSetLayoutCount = 0;
+
+    const VkPushConstantRange* pushConstantRanges = nullptr;
+    uint32 pushConstantRangeCount = 0;
+};
+
 class VulkanPipeline
 {
 public:
@@ -47,6 +59,7 @@ public:
     VulkanPipeline& operator=(const VulkanPipeline&) = delete;
 
     bool Create(VkDevice _device, const VulkanPipelineCreateInfo& createInfo);
+    bool Create(VkDevice _device, const VulkanComputePipelineCreateInfo& createInfo);
     void Destroy();
 
     VkPipeline GetPipeline() const { return pipeline; }
