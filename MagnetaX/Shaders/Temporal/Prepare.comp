@@ -1,0 +1,92 @@
+// Copyright (c) 2026 PulsaX Szymon Krygier
+// SPDX-License-Identifier: MPL-2.0
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthTexture;
+layout(set = 0, binding = 1) uniform sampler2D velocityTexture;
+
+layout(set = 0, binding = 2, r32f) uniform writeonly image2D dilatedDepthImage;
+layout(set = 0, binding = 3, rgba16f) uniform writeonly image2D dilatedVelocityImage;
+
+layout(set = 0, binding = 4, r32ui) uniform uimage2D reconstructedPrevDepthImage;
+
+layout(push_constant) uniform PushConstants
+{
+    vec2 jitterUV;
+    vec2 prevJitterUV;
+} pc;
+
+void main()
+{
+    ivec2 imageSize = textureSize(depthTexture, 0);
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+
+    if (any(greaterThanEqual(coord, imageSize))) return;
+
+    ivec2 maxCoord = imageSize - ivec2(1);
+
+    ivec2 nearestCoord = coord;
+    float nearestDepth = texelFetch(depthTexture, coord, 0).r;
+
+    for (int y = -1; y <= 1; ++y)
+    {
+        for (int x = -1; x <= 1; ++x)
+        {
+            ivec2 sampleCoord = clamp(coord + ivec2(x, y), ivec2(0), maxCoord);
+            float sampleDepth = texelFetch(depthTexture, sampleCoord, 0).r;
+
+            if (sampleDepth < nearestDepth)
+            {
+                nearestDepth = sampleDepth;
+                nearestCoord = sampleCoord;
+            }
+        }
+    }
+
+    vec4 nearestVelocity = texelFetch(velocityTexture, nearestCoord, 0);
+
+    imageStore(dilatedDepthImage, coord, vec4(nearestDepth));
+    imageStore(dilatedVelocityImage, coord, nearestVelocity);
+
+    if (nearestVelocity.w < 0.5) return;
+
+    vec2 currentRasterUV = (vec2(coord) + vec2(0.5)) / vec2(imageSize);
+    vec2 previousUV = currentRasterUV - pc.jitterUV - nearestVelocity.xy + pc.prevJitterUV;
+
+    float expectedPreviousDepth = nearestDepth + nearestVelocity.z;
+
+    if (!(expectedPreviousDepth >= 0.0 && expectedPreviousDepth <= 1.0)) return;
+
+    vec2 previousST = previousUV * vec2(imageSize) - vec2(0.5);
+    ivec2 baseCoord = ivec2(floor(previousST));
+    vec2 fractional = fract(previousST);
+
+    ivec2 offsets[4] = ivec2[4](
+        ivec2(0, 0),
+        ivec2(1, 0),
+        ivec2(0, 1),
+        ivec2(1, 1)
+    );
+
+    float weights[4] = float[4](
+        (1.0 - fractional.x) * (1.0 - fractional.y),
+        fractional.x * (1.0 - fractional.y),
+        (1.0 - fractional.x) * fractional.y,
+        fractional.x * fractional.y
+    );
+
+    const float reconstructedDepthWeightThreshold = 0.01;
+
+    for (int i = 0; i < 4; ++i)
+    {
+        if (weights[i] <= reconstructedDepthWeightThreshold) continue;
+
+        ivec2 storeCoord = baseCoord + offsets[i];
+
+        if (any(lessThan(storeCoord, ivec2(0))) || any(greaterThanEqual(storeCoord, imageSize))) continue;
+
+        imageAtomicMin(reconstructedPrevDepthImage, storeCoord, floatBitsToUint(expectedPreviousDepth));
+    }
+}
