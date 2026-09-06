@@ -37,6 +37,9 @@ struct VulkanPipelineCreateInfo
 
     VkCullModeFlags cullMode = VK_CULL_MODE_NONE;
     VkFrontFace frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
+    bool sampleShading = false;
 };
 
 struct VulkanComputePipelineCreateInfo
