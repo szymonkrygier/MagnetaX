@@ -7,7 +7,7 @@
 
 struct VulkanToneMapPassCreateInfo : VulkanPassCreateInfo
 {
-    VulkanImage* srcImage = nullptr;
+    const VulkanImage* srcImage = nullptr;
     VkFormat outFormat = VK_FORMAT_UNDEFINED;
 };
 

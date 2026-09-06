@@ -16,9 +16,7 @@
 #include "Deferred/VulkanLightingPass.h"
 #include "PostFX/VulkanPostFXPass.h"
 #include "PostFX/VulkanToneMapPass.h"
-#include "Temporal/VulkanTAAPass.h"
-#include "Temporal/VulkanCamVelocityPass.h"
-#include "Temporal/VulkanLuminancePass.h"
+#include "Temporal/VulkanTAA.h"
 #include "Shadow/VulkanShadowDepthPass.h"
 #include "UI/VulkanUIPass.h"
 #include "Environment/VulkanEnvironmentRenderData.h"
@@ -88,7 +86,7 @@ struct VulkanRendererFrameInfo
 //           GBuffer (gBufferPass)
 //                     |
 //              Cam velocity fill
-//              (camVelocityPass)
+//                    (taa)
 //                     |
 //          -----------+-----------
 //          |                     |
@@ -102,7 +100,7 @@ struct VulkanRendererFrameInfo
 //          v                     |
 //   sceneColor (HDR)             |
 //          |                     |
-//    TAA (taaPass)*              |
+//    TAA (taa)*                  |
 //          |                     |
 //          v                     |
 // temporal/sceneColor            |
@@ -182,27 +180,13 @@ private:
     VkImageLayout sceneColorLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Temporal AA (TAA)
-    std::array<VulkanImage, 2> taaHistory;
-    std::array<VkImageLayout, 2> taaHistoryLayouts{ VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED };
-    std::array<VulkanImage, 2> taaDepthHistory;
-    std::array<VkImageLayout, 2> taaDepthHistoryLayouts{ VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED };
-    VulkanImage luminanceContext;
-    VkImageLayout luminanceContextLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    VulkanCamVelocityPass camVelocityPass;
-    VulkanTAAPass taaPass;
-    VulkanLuminancePass luminancePass;
-    uint64 taaFrameIndex = 0;
-    uint32 taaHistoryReadIndex = 0;
+    VulkanTAA taa;
     bool prevFrameValid = false;
-    bool taaHistoryValid = false;
     Matrix4f prevViewProj = Matrix4f::Identity();
-    Vector2f prevJitterUV{};
     Matrix4f prevProj = Matrix4f::Identity();
     uint32 prevCameraId = 0;
     std::unordered_map<uint32, Matrix4f> prevObjectModels;
     std::vector<Matrix4f> framePrevModels;
-    std::array<VulkanImage, 2> taaMetadataHistory;
-    std::array<VkImageLayout, 2> taaMetadataHistoryLayouts{ VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_UNDEFINED };
 
     // Tone mapping pass
     VulkanImage ldrColor;

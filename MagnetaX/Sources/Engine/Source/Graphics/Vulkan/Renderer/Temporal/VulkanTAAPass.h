@@ -14,8 +14,6 @@ struct VulkanTAAPassCreateInfo : VulkanPassCreateInfo
 
     const VulkanImage* velocityImage = nullptr;
     const VulkanImage* depthImage = nullptr;
-
-    VkFormat metadataFormat = VK_FORMAT_UNDEFINED;
 };
 
 struct VulkanTAAPassRenderInfo : VulkanPassRenderInfo
@@ -23,9 +21,6 @@ struct VulkanTAAPassRenderInfo : VulkanPassRenderInfo
     VkImageView historyView = VK_NULL_HANDLE;
     VkImageView targetView = VK_NULL_HANDLE;
     VkImageView previousDepthView = VK_NULL_HANDLE;
-    VkImageView metadataTargetView = VK_NULL_HANDLE;
-    VkImageView metadataHistoryView = VK_NULL_HANDLE;
-    VkImageView luminanceContextView = VK_NULL_HANDLE;
     VkExtent2D extent{};
 
     Vector2f jitterUV{};

@@ -9,8 +9,6 @@ layout(set = 0, binding = 1) uniform sampler2D historyColor;
 layout(set = 0, binding = 2) uniform sampler2D velocityTexture;
 layout(set = 0, binding = 3) uniform sampler2D depthTexture;
 layout(set = 0, binding = 4) uniform sampler2D previousDepthTexture;
-layout(set = 0, binding = 5) uniform sampler2D previousMetadata;
-layout(set = 0, binding = 6) uniform sampler2D luminanceContext;
 
 layout(push_constant) uniform PushConstants
 {
@@ -22,7 +20,6 @@ layout(push_constant) uniform PushConstants
 } pc;
 
 layout(location = 0) out vec4 outColor;
-layout(location = 1) out vec2 outMetadata;
 
 float Luminance(vec3 color)
 {
@@ -40,44 +37,7 @@ vec3 YCoCgToRGB(vec3 color)
     return vec3(color.x + color.y - color.z, color.x + color.z, color.x - color.y - color.z);
 }
 
-bool DetectThinFeature(float luma[9], float relativeThreshold, float absoluteThreshold)
-{
-    const uint blockMasks[4] = uint[4](0x01Bu, 0x036u, 0x0D8u, 0x1B0u);
-
-    float center = luma[4];
-    uint similarMask = 1u << 4u;
-    bool hasLower = false;
-    bool hasHigher = false;
-
-    for (int i = 0; i < 9; ++i)
-    {
-        if (i == 4) continue;
-
-        float delta = luma[i] - center;
-        float threshold = max(absoluteThreshold, relativeThreshold * max(center, luma[i]));
-
-        if (abs(delta) <= threshold)
-        {
-            similarMask |= 1u << uint(i);
-        }
-        else
-        {
-            hasLower = hasLower || delta < 0.0;
-            hasHigher = hasHigher || delta > 0.0;
-        }
-    }
-
-    if (hasLower == hasHigher) return false;
-
-    for (int i = 0; i < 4; ++i)
-    {
-        if ((similarMask & blockMasks[i]) == blockMasks[i]) return false;
-    }
-
-    return true;
-}
-
-void GetRoundedNeighborhood(vec2 uv, vec2 texelSize, out vec3 mean, out vec3 stdDev, out float luma[9])
+void GetRoundedNeighborhood(vec2 uv, vec2 texelSize, out vec3 mean, out vec3 stdDev)
 {
     vec3 topLeft = texture(currentColor, uv + vec2(-texelSize.x, -texelSize.y)).rgb;
     vec3 top = texture(currentColor, uv + vec2(0.0, -texelSize.y)).rgb;
@@ -100,16 +60,6 @@ void GetRoundedNeighborhood(vec2 uv, vec2 texelSize, out vec3 mean, out vec3 std
     vec3 bottomLeftYCoCg = RGBToYCoCg(bottomLeft);
     vec3 bottomYCoCg = RGBToYCoCg(bottom);
     vec3 bottomRightYCoCg = RGBToYCoCg(bottomRight);
-
-    luma[0] = max(topLeftYCoCg.x, 0.0);
-    luma[1] = max(topYCoCg.x, 0.0);
-    luma[2] = max(topRightYCoCg.x, 0.0);
-    luma[3] = max(leftYCoCg.x, 0.0);
-    luma[4] = max(centerYCoCg.x, 0.0);
-    luma[5] = max(rightYCoCg.x, 0.0);
-    luma[6] = max(bottomLeftYCoCg.x, 0.0);
-    luma[7] = max(bottomYCoCg.x, 0.0);
-    luma[8] = max(bottomRightYCoCg.x, 0.0);
 
     vec3 moment1 = topLeftYCoCg + topYCoCg + topRightYCoCg + leftYCoCg + centerYCoCg + rightYCoCg +
         bottomLeftYCoCg + bottomYCoCg + bottomRightYCoCg;
@@ -214,34 +164,6 @@ float GetPreviousDepth(vec2 uv)
     return max(max(depths.x, depths.y), max(depths.z, depths.w));
 }
 
-float DecodeThinReferenceContext(vec2 metadata)
-{
-    if (metadata.r <= 0.0) return 0.0;
-    return metadata.g / metadata.r;
-}
-
-bool ResolveThinLock(bool thinFeatureDetected, vec2 previousThinMetadata, float previousThinFeatureSupport, float currentLuminanceContext, 
-    float lifetimeStep, out vec2 thinMetadata)
-{
-    float lifetime = max(previousThinMetadata.r - lifetimeStep, 0.0);
-    float support = max(previousThinFeatureSupport - lifetimeStep, 0.0);
-    float referenceContext = DecodeThinReferenceContext(previousThinMetadata);
-
-    if (thinFeatureDetected)
-    {
-        if (previousThinMetadata.r <= 0.0) referenceContext = currentLuminanceContext;
-
-        lifetime = 1.0;
-        support = 1.0;
-    }
-
-    if (lifetime <= 0.0) referenceContext = 0.0;
-
-    thinMetadata = vec2(lifetime, lifetime * referenceContext);
-
-    return lifetime > 0.0 || support > 0.0;
-}
-
 void main()
 {
     vec2 currentUV = fragUV + pc.jitterUV;
@@ -252,25 +174,8 @@ void main()
 
     vec3 neighborhoodMean;
     vec3 neighborhoodStdDev;
-    float neighborhoodLuma[9];
 
-    GetRoundedNeighborhood(currentUV, texelSize, neighborhoodMean, neighborhoodStdDev, neighborhoodLuma);
-
-    const float thinFeatureRelativeThreshold = 0.05;
-    const float thinFeatureAbsoluteThreshold = 0.001;
-
-    bool thinFeatureDetected = DetectThinFeature(neighborhoodLuma, thinFeatureRelativeThreshold, thinFeatureAbsoluteThreshold);
-
-    vec2 luminanceContextSize = vec2(textureSize(luminanceContext, 0));
-    vec2 luminanceContextUV = currentUV * vec2(textureSize(currentColor, 0)) / (luminanceContextSize * 8.0);
-    float currentLuminanceContext = textureLod(luminanceContext, luminanceContextUV, 0.0).r;
-
-    float surroundingLuminance = (neighborhoodLuma[0] + neighborhoodLuma[1] + neighborhoodLuma[2] + neighborhoodLuma[3] + 
-        neighborhoodLuma[5] + neighborhoodLuma[6] + neighborhoodLuma[7] + neighborhoodLuma[8]) * 0.125;
-
-    const float thinFeatureLifetimeStep = 1.0 / 16.0;
-
-    outMetadata = vec2(thinFeatureDetected ? 1.0 : 0.0, thinFeatureDetected ? currentLuminanceContext : 0.0);
+    GetRoundedNeighborhood(currentUV, texelSize, neighborhoodMean, neighborhoodStdDev);
 
     if (pc.historyValid == 0)
     {
@@ -317,18 +222,9 @@ void main()
         return;
     }
 
-    vec2 previousThinMetadata = textureLod(previousMetadata, previousUV, 0.0).rg;
-    vec4 previousThinLifetimeSamples = textureGather(previousMetadata, previousUV, 0);
-    float previousThinFeatureSupport = max(max(previousThinLifetimeSamples.x, previousThinLifetimeSamples.y), max(previousThinLifetimeSamples.z, previousThinLifetimeSamples.w));
-    
     vec4 history = SampleHistoryCatmullRom(previousUV);
     float previousHistoryMass = textureLod(historyColor, previousUV, 0.0).a;
     vec3 historyYCoCg = RGBToYCoCg(history.rgb);
-
-    vec2 thinMetadata;
-    bool thinLockValid = ResolveThinLock(thinFeatureDetected, previousThinMetadata, previousThinFeatureSupport, currentLuminanceContext, thinFeatureLifetimeStep, thinMetadata);
-
-    outMetadata = thinMetadata;
 
     vec2 imageSize = vec2(textureSize(currentColor, 0));
     vec2 velocityPixels = velocity.xy * imageSize;
@@ -348,11 +244,6 @@ void main()
     historyAcceptance = mix(vec3(1.0), historyAcceptance, greaterThan(historyDeviation, vec3(0.000001)));
     float acceptedHistory = min(historyAcceptance.x, min(historyAcceptance.y, historyAcceptance.z));
 
-    float historyContrast = abs(historyYCoCg.x - surroundingLuminance) / max(max(abs(historyYCoCg.x), surroundingLuminance), 0.05);
-    float historyDetailConfidence = smoothstep(0.05, 0.20, historyContrast);
-
-    if (thinLockValid) clippedHistoryYCoCg.x = historyYCoCg.x;
-
     historyYCoCg = clippedHistoryYCoCg;
     history.rgb = YCoCgToRGB(historyYCoCg);
 
@@ -363,16 +254,13 @@ void main()
     float similarity = clamp(1.0 - luminanceDifference, 0.0, 1.0);
 
     float feedback = mix(pc.feedbackMin, pc.feedbackMax, similarity * similarity);
-    float thinFeatureFeedback = pow(pc.feedbackMax, thinFeatureLifetimeStep);
-
-    if (thinLockValid) feedback = thinFeatureFeedback;
 
     const float maxHistoryMass = 65504.0;
     float historyBudget = min(feedback / max(1.0 - feedback, 0.000001), maxHistoryMass);
     float acceptedHistoryMass = min(max(previousHistoryMass, 0.0), historyBudget);
 
     //if (!thinLockValid && historyWasClipped) acceptedHistoryMass = min(acceptedHistoryMass, 1.0);
-    if (!thinLockValid) acceptedHistoryMass *= acceptedHistory;
+    acceptedHistoryMass *= acceptedHistory;
 
     float currentWeight = 1.0 / (acceptedHistoryMass + 1.0);
 
